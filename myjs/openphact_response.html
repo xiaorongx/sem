@@ -1,0 +1,112 @@
+
+<!doctype html>
+
+<meta charset="utf-8">
+<title>Render Openphact response template</title>
+
+<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+<script src="http://cpettitt.github.io/project/graphlib/latest/graphlib.min.js"></script>
+<script src="http://cpettitt.github.io/project/dagre-d3/latest/dagre-d3.min.js"></script>
+<script src="underscore-min.js"></script>
+<script src="jquery-1.11.1.min.js"></script>
+
+
+<style>
+svg {
+  border: 1px solid black;
+  overflow: hidden;
+}
+
+text {
+  font-weight: 300;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serf;
+  font-size: 14px;
+}
+
+.node rect {
+  stroke-width: 2px;
+  stroke: #333;
+  fill: #fff;
+}
+
+#opTarget {
+  text-decoration: underline
+}
+
+#opCompound {
+  text-decoration: underline
+}
+.edgeLabel rect {
+  fill: #fff;
+}
+
+.edgePath path {
+  stroke: #333;
+  stroke-width: 1.5px;
+  fill: none;
+}
+</style>
+
+<body>
+<p>Click link to display a diagram that show response from <a href="https://dev.openphacts.org/docs/1.3">OpenPhacts api</a> graphically</p>
+<p id="opTarget">Target Pharmacology List</p>
+<p id="opCompound">Compound Information</p>
+<svg width=650 height=680><g transform="translate(20,20)"/></svg>
+
+<script>
+$("#opTarget").click(function(){draw('');});
+$("#opCompound").click(function(){draw(this.id);});
+function draw(inputid) {
+  var input = "?item chembl:hasMolecule ?compound_chembl ;chembl:publishedType ?published_type ;chembl:publishedRelation ?published_relation ;chembl:publishedValue ?published_value ;chembl:publishedUnits ?published_unit ;chembl:standardType ?activity_type ;chembl:standardRelation ?activity_relation ;chembl:standardValue ?activity_value ;chembl:hasQUDT ?qudt_uri ;chembl:hasAssay ?assay_uri ;chembl:assayTestType ?assay_type ;chembl:pChembl ?pChembl ;chembl:activityComment ?act_comment ;bibo:pmid ?pmid ;chembl:hasDocument ?doi ;void:inDataset <http://www.ebi.ac.uk/chembl> .?qudt_uri skos:prefLabel ?activity_unit .?assay_uri chembl:assayOrganismName ?assay_organism ;chembl:hasTarget ?chembl_target_uri ;dcterms:description ?assay_description ;void:inDataset <http://www.ebi.ac.uk/chembl> .?chembl_target_uri dcterms:title ?target_name_chembl ;chembl:targetOrganismName ?target_organism ;chembl:hasTargetComponent ?protein ;a ?target_type ;void:inDataset <http://www.ebi.ac.uk/chembl> .?protein skos:exactMatch ?cw_target .?cw_target skos:prefLabel ?protein_name ;void:inDataset <http://www.conceptwiki.org> .?compound_chembl skos:exactMatch ?compound_ocrs ;skos:exactMatch ?compound_cw .?compound_ocrs ops:smiles ?smiles ;ops:inchi ?inchi ;ops:inchikey ?inchi_key ;ops:molweight ?molweight ;ops:ro5_violations ?num_ro5_violations ;void:inDataset <http://ops.rsc.org> .?compound_cw skos:prefLabel ?compound_name ;void:inDataset <http://www.conceptwiki.org> .";
+  if (inputid=='opCompound') {
+    input = "?ops_item skos:exactMatch ?cw_compound_uri .?cw_compound_uri skos:prefLabel ?compound_name ;void:inDataset <http://www.conceptwiki.org> .?ops_item skos:exactMatch ?ocrs_compound_uri .?ocrs_compound_uri ops:smiles ?smiles ;ops:inchi ?inchi ;ops:inchikey ?inchiKey ;ops:logp ?alogp ;ops:hba ?hba ;ops:hbd ?hbd ;ops:ro5_violations ?num_ro5_violations ;ops:psa ?psa ;ops:rtb ?rtb ;ops:molweight ?molweight ;ops:molformula ?molformula ;void:inDataset <http://ops.rsc.org> .?ops_item skos:exactMatch ?chembl_compound_uri .?chembl_compound_uri ?bNode1 ?mw_freebase ;a ?mol_type ;void:inDataset <http://www.ebi.ac.uk/chembl> .?ops_item skos:exactMatch ?db_compound_uri .?db_compound_uri drugbank:biotransformation ?biotransformation ;drugbank:description ?description ;drugbank:proteinBinding ?proteinBinding ;drugbank:toxicity ?toxicity ;drugbank:meltingPoint ?meltingPoint ;drugbank:genericName ?drug_name ;drugbank:drugType ?drugType ;void:inDataset <http://linkedlifedata.com/resource/drugbank> ."
+  }
+  input = input.replace(/</g, '').replace(/>/g, '');
+  console.log(input);
+  var blocks = input.split(" .");
+  var nodes = [];
+  var edges = [];
+  for (var i=0; i < blocks.length; i++){
+      var statements = blocks[i].split(" ;");
+      var subjectElement;
+      var objectElement;
+      var predicate;
+
+      for (var j=0; j < statements.length; j++) {
+        var tokens = statements[j].split(" ");
+        if (tokens.length == 3) {
+          subjectElement = tokens[0];
+          predicate = tokens[1];
+          objectElement = tokens[2]; 
+        }
+        else if (tokens.length == 2) {
+          predicate = tokens[0];
+          objectElement = tokens[1];
+        }
+        if (!_.find(nodes, function(node){return node.id===subjectElement;}))
+          {
+            nodes.push({id: subjectElement, value: {label: subjectElement}});
+          }
+        if (!_.find(nodes, function(node){return node.id===objectElement;}))
+          {
+            nodes.push({id: objectElement, value: {label: objectElement}});
+          }
+        if (!_.find(edges, function(edge){return subjectElement===edge.u&&edge.v===objectElement})){
+            edges.push({u: subjectElement, v: objectElement, value: {label: predicate}});
+          }
+      }
+  };
+
+  var renderer = new dagreD3.Renderer();
+  var oldDrawNodes = renderer.drawNodes();
+  renderer.drawNodes(function(graph, root) {
+    var svgNodes = oldDrawNodes(graph, root);
+    svgNodes.attr("id", function(u) { return "node-" + u; });
+    return svgNodes;
+  });
+  var layout = renderer.run(dagreD3.json.decode(nodes, edges), d3.select("svg g"));
+  d3.select("svg")
+    .attr("width", layout.graph().width + 40)
+    .attr("height", layout.graph().height + 40);
+}
+</script>
