@@ -7,7 +7,7 @@ import smile.plot.PlotCanvas;
 public class Paint extends JFrame{
     public Paint(PlotCanvas plot) {
         super("data distribution");
-        setSize(300, 300);
+        setSize(400, 400);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         add(plot);
     }
